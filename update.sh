@@ -29,6 +29,19 @@ function check_remotes() {
 	return 1
 }
 
+function notify_conflict() {
+	if [ ! -x "$(command -v gh)" ]
+	then
+		err "Error: please install gh (github-cli)"
+		return
+	fi
+	local msg="$1"
+	gh issue create \
+		--title "Merge conflict with ddnet" \
+		--body "$msg" \
+		--repo "chillerbot/chillerbot-ux"
+}
+
 function update_ux() {
 	if [ ! -d ../chillerbot-ux ]
 	then
@@ -63,9 +76,31 @@ function update_ux() {
 		git checkout chillerbot || { err "Error: git checkout failed"; exit 1; }
 		git pull || { err "Error: git pull failed"; exit 1; }
 		git push || { err "Error: git push failed"; exit 1; }
-		git merge master --commit --no-edit || { err "Error: git merge failed"; exit 1; }
+		git merge master --commit --no-edit || \
+			{
+				err "Error: git merge failed";
+				notify_conflict "merge with upstream/master failed";
+				exit 1;
+			}
 	) || exit 1
 }
 
-update_ux
+
+function sleep_hours() {
+	local i
+	local hours=$1
+	for ((i=0;i<hours;i++))
+	do
+		sleep 1h
+		printf .
+	done
+	echo ""
+}
+
+while true
+do
+	update_ux
+	log "Sleeping 24 hours"
+	sleep_hours 24
+done
 
