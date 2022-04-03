@@ -130,7 +130,7 @@ function update_ux() {
 	git pull || { err "Error: git pull failed"; exit 1; }
 	git push || { err "Error: git push failed"; exit 1; }
 	git fetch ddnet || { err "Error: git fetch failed"; exit 1; }
-	git checkout master || { err "Error: git checkout failed"; exit 1; }
+	git checkout --track origin/master || { err "Error: git checkout failed"; exit 1; }
 	git pull || { err "Error: git pull failed"; exit 1; }
 	git push || { err "Error: git push failed"; exit 1; }
 	git reset --hard ddnet/master || { err "Error: git reset failed"; exit 1; }
@@ -181,15 +181,54 @@ function sleep_hours() {
 	echo ""
 }
 
-while true
-do
+function update_all() {
 	update_ux
 	if update_zx
 	then
 		err "Error: updating chillerbot-zx failed"
 		exit 1
 	fi
-	log "Sleeping 24 hours"
-	sleep_hours 24
+}
+
+function update_loop() {
+	while true
+	do
+		update_all
+		log "Sleeping 24 hours"
+		sleep_hours 24
+	done
+}
+
+function show_help() {
+	cat <<-EOF
+	usage: $(basename "$0") [OPTION]"
+	options:
+	  --help|-h	shows this help page
+	  --loop|-l	keeps running and updates every 24 hours
+	EOF
+}
+
+arg_loop=0
+
+for arg in "$@"
+do
+	if [ "$arg" == "-h" ] || [ "$arg" == "--help" ]
+	then
+		show_help
+		exit 0
+	elif [ "$arg" == "-l" ] || [ "$arg" == "--loop" ]
+	then
+		arg_loop=1
+	else
+		err "Error: unkown argument '$arg' see '--help'"
+		exit 1
+	fi
 done
+
+if [ "$arg_loop" == "1" ]
+then
+	update_loop
+else
+	update_all
+fi
 
