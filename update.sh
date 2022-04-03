@@ -1,7 +1,15 @@
 #!/bin/bash
 
+arg_loop=0
+arg_no_clang_tidy=0
+arg_no_build=0
+
 function err() {
 	printf "[-] %s\n" "$1"
+}
+
+function wrn() {
+	printf "[!] %s\n" "$1"
 }
 
 function log() {
@@ -15,6 +23,75 @@ function get_cores() {
 	else
 		echo 1
 	fi
+}
+
+function gh_ddnet_prs() {
+	gh pr list -L512 -R ddnet/ddnet | awk '{ print $1 }'
+}
+
+function merge_pull_error() {
+	echo "Failed to merge https://github.com/ddnet/ddnet/pull/$pull into chillerbot"
+	echo ''
+	echo '```'
+	echo '$ git status'
+	git status
+	echo '```'
+	echo ''
+	echo 'Conflicts:'
+	# maybe using this is better and simpler
+	# git --no-pager diff
+	local conflict
+	for conflict in $(git status | grep 'both modified:' | awk '{print $3}')
+	do
+		printf '```'
+		if [[ "$conflict" == *".c" ]] || [[ "$conflict" == *".h" ]]
+		then
+			printf 'cpp'
+		elif [[ "$conflict" == *".py" ]]
+		then
+			printf 'python'
+		fi
+		echo ''
+		echo "$conflict"
+		grep -C 10 -F '<<<<<<< HEAD' "$conflict"
+		echo '```'
+		echo ''
+	done
+}
+
+function check_ddnet_prs() {
+	local pull
+	for pull in $(gh_ddnet_prs)
+	do
+		set -x
+		git branch updatebot-test-pull-ddnet
+		git branch updatebot-test-pull-chillerbot
+		git checkout updatebot-test-pull-ddnet || return 0
+		git fetch ddnet || return 0
+		git reset --hard ddnet/master || return 0
+		# if this fails its conflicing from pull to ddnet/master already so skip it
+		# yea not too sure about that
+		# git pull ddnet pull/"$pull"/head || { git rebase --abort || return 0; continue; }
+		git checkout chillerbot || return 0
+		git branch -D updatebot-test-pull-ddnet || return 0
+		git fetch ddnet pull/"$pull"/head:updatebot-test-pull-ddnet || return 0
+		git checkout updatebot-test-pull-chillerbot || return 0
+		git reset --hard origin/chillerbot || return 0
+		set +x
+		git merge updatebot-test-pull-ddnet --commit --no-edit || \
+			{
+				wrn "Warning: pull $pull failed to merge";
+				if [ "$(gh issue list --search "ddnet/pulls/$pull" -R chillerbot/chillerbot-ux)" == "" ];
+				then
+					notify_conflict \
+						"$(merge_pull_error "$pull")" \
+						"Merge conflict with ddnet/pulls/$pull";
+				fi;
+				git merge --abort;
+				git checkout chillerbot;
+			}
+	done
+	return 1
 }
 
 function check_remotes_ux() {
@@ -39,14 +116,18 @@ function check_remotes_ux() {
 }
 
 function notify_conflict() {
+	# args:
+	#  issue_body
+	#  [issue_title] (default: "Merge conflict with ddnet")
 	if [ ! -x "$(command -v gh)" ]
 	then
 		err "Error: please install gh (github-cli)"
 		return
 	fi
 	local msg="$1"
+	local title="${2:-'Merge conflict with ddnet'}"
 	gh issue create \
-		--title "Merge conflict with ddnet" \
+		--title "$title" \
 		--body "$msg" \
 		--repo "chillerbot/chillerbot-ux"
 }
@@ -94,7 +175,7 @@ function update_zx() {
 	git checkout zx || return 0
 	git merge ux --commit --no-edit || return 0
 	git submodule update || return 0
-	if [ -d build ]
+	if [ -d build ] && [ "$arg_no_build" == "0" ]
 	then
 		pushd build || return 0
 		make -j"$(get_cores)" || return 0
@@ -127,8 +208,6 @@ function update_ux() {
 		err "Error: working tree no clean"
 		exit 1
 	fi
-	git pull || { err "Error: git pull failed"; exit 1; }
-	git push || { err "Error: git push failed"; exit 1; }
 	git fetch ddnet || { err "Error: git fetch failed"; exit 1; }
 	git checkout master || { err "Error: git checkout failed"; exit 1; }
 	git pull || { err "Error: git pull failed"; exit 1; }
@@ -144,7 +223,7 @@ function update_ux() {
 			notify_conflict "merge with upstream/master failed";
 			exit 1;
 		}
-	if [ -d build ]
+	if [ -d build ] && [ "$arg_no_build" == "0" ]
 	then
 		pushd build || exit 1
 		make -j"$(get_cores)" || \
@@ -155,7 +234,7 @@ function update_ux() {
 			}
 		popd || exit 1
 	fi
-	if [ -d clang-tidy ]
+	if [ -d clang-tidy ] && [ "$arg_no_clang_tidy" == "0" ]
 	then
 		pushd clang-tidy || exit 1
 		cmake --build . --config Debug --target everything -- -k 0 || \
@@ -166,6 +245,11 @@ function update_ux() {
 			}
 		popd || exit 1
 	fi
+	# if check_ddnet_prs
+	# then
+	# 	err "Error: something went wrong while testing pullrequests"
+	# 	exit 1
+	# fi
 	popd || exit 1
 }
 
@@ -204,12 +288,12 @@ function show_help() {
 	cat <<-EOF
 	usage: $(basename "$0") [OPTION]"
 	options:
-	  --help|-h	shows this help page
-	  --loop|-l	keeps running and updates every 24 hours
+	  --help|-h		shows this help page
+	  --loop|-l		keeps running and updates every 24 hours
+	  --no-clang-tidy 	skip clang tidy build
+	  --no-build 		skip normal build test
 	EOF
 }
-
-arg_loop=0
 
 for arg in "$@"
 do
@@ -220,6 +304,12 @@ do
 	elif [ "$arg" == "-l" ] || [ "$arg" == "--loop" ]
 	then
 		arg_loop=1
+	elif [ "$arg" == "--no-clang-tidy" ]
+	then
+		arg_no_clang_tidy=1
+	elif [ "$arg" == "--no-build" ]
+	then
+		arg_no_build=1
 	else
 		err "Error: unkown argument '$arg' see '--help'"
 		exit 1
