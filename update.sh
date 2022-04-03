@@ -130,7 +130,7 @@ function update_ux() {
 	git pull || { err "Error: git pull failed"; exit 1; }
 	git push || { err "Error: git push failed"; exit 1; }
 	git fetch ddnet || { err "Error: git fetch failed"; exit 1; }
-	git checkout --track origin/master || { err "Error: git checkout failed"; exit 1; }
+	git checkout master || { err "Error: git checkout failed"; exit 1; }
 	git pull || { err "Error: git pull failed"; exit 1; }
 	git push || { err "Error: git push failed"; exit 1; }
 	git reset --hard ddnet/master || { err "Error: git reset failed"; exit 1; }
