@@ -193,6 +193,7 @@ function update_all() {
 function update_loop() {
 	while true
 	do
+		git pull
 		update_all
 		log "Sleeping 24 hours"
 		sleep_hours 24
