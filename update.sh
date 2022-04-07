@@ -221,6 +221,8 @@ function update_ux() {
 	git push || { err "Error: git push failed"; exit 1; }
 	git checkout chillerbot || { err "Error: git checkout failed"; exit 1; }
 	git pull || { err "Error: git pull failed"; exit 1; }
+	git reset --hard origin/chillerbot || \
+		{ err "Error: git reset origin/chillerbot (cleanup) failed"; exit 1; }
 	git merge master --commit --no-edit || \
 		{
 			err "Error: git merge failed";
