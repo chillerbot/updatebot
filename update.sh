@@ -251,6 +251,7 @@ function update_ux() {
 			}
 		popd || exit 1
 	fi
+	git push || { err "Error: git push failed"; exit 1; }
 	# if check_ddnet_prs
 	# then
 	# 	err "Error: something went wrong while testing pullrequests"
