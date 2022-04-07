@@ -61,23 +61,31 @@ function merge_pull_error() {
 
 function check_ddnet_prs() {
 	local pull
+	# prepare master branch for pr conflicts with ddnet
+	git fetch ddnet || return 0
+	git checkout master || return 0
+	git reset --hard ddnet/master || return 0
 	for pull in $(gh_ddnet_prs)
 	do
-		set -x
-		git branch updatebot-test-pull-ddnet
-		git branch updatebot-test-pull-chillerbot
-		git checkout updatebot-test-pull-ddnet || return 0
-		git fetch ddnet || return 0
-		git reset --hard ddnet/master || return 0
-		# if this fails its conflicing from pull to ddnet/master already so skip it
-		# yea not too sure about that
-		# git pull ddnet pull/"$pull"/head || { git rebase --abort || return 0; continue; }
-		git checkout chillerbot || return 0
-		git branch -D updatebot-test-pull-ddnet || return 0
-		git fetch ddnet pull/"$pull"/head:updatebot-test-pull-ddnet || return 0
+		git branch -D updatebot-test-pull-ddnet &> /dev/null
+		git branch updatebot-test-pull-ddnet &> /dev/null
+		git branch updatebot-test-pull-chillerbot &> /dev/null
+		git checkout updatebot-test-pull-ddnet &> /dev/null || return 0
+		git fetch ddnet &> /dev/null || return 0
+		git reset --hard ddnet/master &> /dev/null || return 0
+		git checkout chillerbot &> /dev/null || return 0
+		git branch -D updatebot-test-pull-ddnet &> /dev/null || return 0
+		git fetch ddnet pull/"$pull"/head:updatebot-test-pull-ddnet &> /dev/null || return 0
+		git checkout master &> /dev/null || return 0
+		if ! git merge updatebot-test-pull-ddnet --no-ff --no-commit &> /dev/null
+		then
+			# skip prs that already conflict with ddnet master
+			git merge --abort || return 0
+			continue
+		fi
+		git merge --abort || return 0
 		git checkout updatebot-test-pull-chillerbot || return 0
 		git reset --hard origin/chillerbot || return 0
-		set +x
 		git merge updatebot-test-pull-ddnet --commit --no-edit || \
 			{
 				wrn "Warning: pull $pull failed to merge";
@@ -252,11 +260,11 @@ function update_ux() {
 		popd || exit 1
 	fi
 	git push || { err "Error: git push failed"; exit 1; }
-	# if check_ddnet_prs
-	# then
-	# 	err "Error: something went wrong while testing pullrequests"
-	# 	exit 1
-	# fi
+	if check_ddnet_prs
+	then
+		err "Error: something went wrong while testing pullrequests"
+		exit 1
+	fi
 	popd || exit 1
 }
 
