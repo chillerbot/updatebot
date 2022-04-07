@@ -170,9 +170,9 @@ function update_zx() {
 	fi
 	local ux_remote
 	ux_remote="$(git remote -v | grep -E '^ux[[:space:]]' | awk '{ print $2 }' | tail -n1)"
-	if [ "$ux_remote" != "git@github.com:chillerbot/chillerbot-ux.git" ]
+	if [[ ! "$ux_remote" =~ (git@|https://)github.com(:|/)chillerbot/chillerbot-ux(.git|/)? ]]
 	then
-		err "Error: invalid ux remote '$ddnet_remote'"
+		err "Error: invalid ux remote '$ux_remote'"
 		return 0
 	fi
 	git fetch ux || return 0
