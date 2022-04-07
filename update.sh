@@ -125,7 +125,7 @@ function notify_conflict() {
 		return
 	fi
 	local msg="$1"
-	local title="${2:-'Merge conflict with ddnet'}"
+	local title="${2:-Merge conflict with ddnet}"
 	gh issue create \
 		--title "$title" \
 		--body "$msg" \
