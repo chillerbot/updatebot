@@ -173,6 +173,7 @@ function update_zx() {
 	git submodule update || return 0
 	git push || return 0
 	git checkout zx || return 0
+	git pull || return 0
 	git merge ux --commit --no-edit || return 0
 	git submodule update || return 0
 	if [ -d build ] && [ "$arg_no_build" == "0" ]
@@ -181,6 +182,7 @@ function update_zx() {
 		make -j"$(get_cores)" || return 0
 		popd || return 0
 	fi
+	git pull || return 0
 	git push || return 0
 	popd || return 0
 	return 1
