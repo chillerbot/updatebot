@@ -29,6 +29,21 @@ function gh_ddnet_prs() {
 	gh pr list -L512 -R ddnet/ddnet | awk '{ print $1 }'
 }
 
+if [ ! -x "$(command -v gh)" ]
+then
+	err "Error: missing dependency gh (github-cli)"
+	exit 1
+fi
+
+auth_status="$(gh auth status 2>&1)"
+
+if ! echo "$auth_status" | grep -qE 'as (ChillerDragon|chillerbotpng) \('
+then
+	gh auth status
+	err "Error: not logged in as one of the whitelisted github accounts"
+	exit 1
+fi
+
 function merge_pull_error() {
 	echo "Failed to merge https://github.com/ddnet/ddnet/pull/$pull into chillerbot"
 	echo ''
@@ -127,11 +142,6 @@ function notify_conflict() {
 	# args:
 	#  issue_body
 	#  [issue_title] (default: "Merge conflict with ddnet")
-	if [ ! -x "$(command -v gh)" ]
-	then
-		err "Error: please install gh (github-cli)"
-		return
-	fi
 	local msg="$1"
 	local title="${2:-Merge conflict with ddnet}"
 	gh issue create \
