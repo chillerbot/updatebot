@@ -173,7 +173,13 @@ function update_zx() {
 	git submodule update || return 0
 	git push || return 0
 	git checkout zx || return 0
-	git merge ux --commit --no-edit || return 0
+	git merge ux --commit --no-edit || \
+		{
+			err "Error: failed to merge chillerbot-zx";
+			git status;
+			git merge --abort;
+			exit 1;
+		}
 	git submodule update || return 0
 	if [ -d build ] && [ "$arg_no_build" == "0" ]
 	then
