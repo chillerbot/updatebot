@@ -250,6 +250,7 @@ function update_ux() {
 	git merge master --commit --no-edit || \
 		{
 			err "Error: git merge failed";
+			git merge --abort;
 			notify_conflict "merge with upstream/master failed";
 			exit 1;
 		}
